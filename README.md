@@ -1,2 +1,3 @@
 # wattshow
-Show power consumption on status bar
+Gnome-Shell extension which shows power consumption on status bar
+
