@@ -69,19 +69,22 @@ WattMeter.prototype =
             power=power.toFixed(2);
             power_text=power.toString();
             temp.set_text(power_text+'w');
-            this._enable();
 
+            return true;
         },
 
         _enable: function()
         {
-            this.interval = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000,
-                                        Lang.bind(this, this._refresh));
+            if (!this.interval) {
+                this.interval = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000,
+                                            Lang.bind(this, this._refresh));
+            }
         },
 
         _disable: function()
         {
             GLib.source_remove(this.interval)
+            this.interval = null;
         }
 }
 
