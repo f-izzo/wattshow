@@ -63,7 +63,7 @@ WattMeter.prototype =
             }
             else
             {
-                log('Error reading file ' + this.bat);
+                log('Error reading file ' + this.filePath);
             }
             power=power/1000000;
             power=power.toFixed(2);
