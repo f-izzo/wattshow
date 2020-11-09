@@ -8,7 +8,9 @@ const PanelMenu = imports.ui.panelMenu;
 const Shell = imports.gi.Shell;
 const St = imports.gi.St;
 
-const FILE_PATH = "/sys/class/power_supply/BAT0/power_now";
+const POWER_PATH = "/sys/class/power_supply/BAT0/power_now";
+const CURRENT_PATH = "/sys/class/power_supply/BAT0/current_now";
+const VOLTAGE_PATH = "/sys/class/power_supply/BAT0/voltage_now";
 
 let wattmeter = null;
 
@@ -42,8 +44,14 @@ function loadFile(path, cancellable = null) {
 }
 
 async function getPower(cancellable = null) {
-    const power = parseInt(await loadFile(FILE_PATH, cancellable));
-    return power / 1000000;
+    if (GLib.file_test(POWER_PATH, GLib.FileTest.EXISTS)) {
+        const power = parseInt(await loadFile(POWER_PATH, cancellable));
+        return power / 1000000;
+    } else {
+        const voltage = parseInt(await loadFile(VOLTAGE_PATH, cancellable));
+        const current = parseInt(await loadFile(CURRENT_PATH, cancellable));
+        return voltage * current / 1000000000000;
+    }
 }
 
 // WattMeter object
