@@ -1,12 +1,16 @@
+const ByteArray = imports.byteArray
 const Clutter = imports.gi.Clutter
 const GLib = imports.gi.GLib;
 const GObject = imports.gi.GObject
+const Gio = imports.gi.Gio;
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const Shell = imports.gi.Shell;
 const St = imports.gi.St;
 
-const FILE_PATH = "/sys/class/power_supply/BAT0/power_now";
+const POWER_PATH = "/sys/class/power_supply/BAT0/power_now";
+const CURRENT_PATH = "/sys/class/power_supply/BAT0/current_now";
+const VOLTAGE_PATH = "/sys/class/power_supply/BAT0/voltage_now";
 
 let wattmeter = null;
 
@@ -25,6 +29,31 @@ function disable()
     wattmeter = null;
 }
 
+function loadFile(path, cancellable = null) {
+    const file = Gio.File.new_for_path(path);
+    return new Promise((resolve, reject) => {
+        file.load_contents_async(cancellable, (source_object, res) => {
+            try {
+                const [,contents,] = source_object.load_contents_finish(res);
+                resolve(ByteArray.toString(contents));
+            } catch (e) {
+                reject(e);
+            }
+        });
+    });
+}
+
+async function getPower(cancellable = null) {
+    if (GLib.file_test(POWER_PATH, GLib.FileTest.EXISTS)) {
+        const power = parseInt(await loadFile(POWER_PATH, cancellable));
+        return power / 1000000;
+    } else {
+        const voltage = parseInt(await loadFile(VOLTAGE_PATH, cancellable));
+        const current = parseInt(await loadFile(CURRENT_PATH, cancellable));
+        return voltage * current / 1000000000000;
+    }
+}
+
 // WattMeter object
 var WattMeter = GObject.registerClass(
     class WattMeter extends PanelMenu.Button {
@@ -33,26 +62,22 @@ var WattMeter = GObject.registerClass(
 
             this.buttonText = new St.Label({text:_("(...)"), y_align: Clutter.ActorAlign.CENTER});
             this.add_actor(this.buttonText);
+            this.cancellable = new Gio.Cancellable();
             this.interval = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 5000, this._refresh.bind(this));
             this._refresh();
         }
 
         destroy() {
             GLib.source_remove(this.interval)
+            this.cancellable.cancel();
 
             super.destroy();
         }
 
         _refresh() {
-            let power = 0;
-
-            if (GLib.file_test(FILE_PATH, GLib.FileTest.EXISTS)) {
-                power = Shell.get_file_contents_utf8_sync(FILE_PATH);
-            } else {
-                log('Error reading file ' + FILE_PATH);
-            }
-
-            this.buttonText.set_text((power / 1000000).toFixed(2).toString() + 'w');
+            getPower(this.cancellable).then(power => {
+                this.buttonText.set_text(power.toFixed(2).toString() + 'w');
+            }).catch(e => log(e.toString()));
 
             return true;
         }
